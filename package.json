@@ -1,0 +1,23 @@
+{
+  "name": "task-manager-monorepo",
+  "version": "1.0.0",
+  "description": "Task Manager — Full MERN Stack Assessment (Hammoq Infosystems)",
+  "private": true,
+  "scripts": {
+    "start:backend": "npm --prefix backend start",
+    "dev:backend": "npm --prefix backend run dev",
+    "dev:frontend": "npm --prefix frontend run dev",
+    "test:backend": "npm --prefix backend test",
+    "seed:admin": "npm --prefix backend run seed:admin",
+    "build:frontend": "npm --prefix frontend run build"
+  },
+  "keywords": [
+    "mern",
+    "react",
+    "node",
+    "express",
+    "mongodb"
+  ],
+  "author": "",
+  "license": "ISC"
+}

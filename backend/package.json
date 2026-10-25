@@ -1,0 +1,42 @@
+{
+  "name": "task-manager-backend",
+  "version": "1.0.0",
+  "description": "Production-conscious Task Manager API - Full MERN Stack Assessment",
+  "main": "src/server.js",
+  "type": "commonjs",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "nodemon src/server.js",
+    "test": "jest --runInBand --detectOpenHandles --forceExit",
+    "test:coverage": "jest --coverage --runInBand --detectOpenHandles --forceExit",
+    "seed:admin": "node src/scripts/createAdmin.js"
+  },
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "cookie-parser": "^1.4.6",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "express-rate-limit": "^7.3.1",
+    "helmet": "^7.1.0",
+    "jsonwebtoken": "^9.0.2",
+    "mongoose": "^8.5.1",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "jest": "^29.7.0",
+    "mongodb-memory-server": "^9.2.0",
+    "nodemon": "^3.1.4",
+    "supertest": "^7.0.0"
+  },
+  "keywords": [
+    "mern",
+    "task-manager",
+    "express",
+    "mongodb",
+    "jwt",
+    "security"
+  ],
+  "author": "",
+  "license": "ISC"
+}
