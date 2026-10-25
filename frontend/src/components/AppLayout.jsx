@@ -1,6 +1,7 @@
 import React from 'react';
 import { NavLink, Outlet, useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import NotificationBell from './NotificationBell';
 
 const AppLayout = () => {
   const { user, isAdmin, logout } = useAuth();
@@ -59,6 +60,8 @@ const AppLayout = () => {
           </nav>
 
           <div className="user-profile-widget">
+            <NotificationBell />
+
             <div className="user-info">
               <span className="user-name" id="user-display-name">{user?.name}</span>
               <span

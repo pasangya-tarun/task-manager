@@ -9,7 +9,7 @@ const envSchema = z.object({
   PORT: z.string().default('5000').transform((val) => parseInt(val, 10)),
   MONGODB_URI: z.string({
     required_error: 'MONGODB_URI is required. Please check your .env configuration.',
-  }).min(1, 'MONGODB_URI cannot be empty'),
+  }).min(1, 'MONGODB_URI cannot be empty').transform((val) => val.replace(/^MONGODB_URI=/, '').trim()),
   CLIENT_URL: z.string().default('http://localhost:5173'),
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
   JWT_SECRET: z.string({
@@ -19,6 +19,12 @@ const envSchema = z.object({
   COOKIE_SECRET: z.string({
     required_error: 'COOKIE_SECRET is required. Provide a distinct secret in .env.',
   }).min(16, 'COOKIE_SECRET must be at least 16 characters long'),
+  EMAIL_HOST: z.string().optional().default(''),
+  EMAIL_PORT: z.string().optional().default('587').transform((val) => parseInt(val, 10) || 587),
+  EMAIL_SECURE: z.string().optional().default('false').transform((val) => val === 'true'),
+  EMAIL_USER: z.string().optional().default(''),
+  EMAIL_PASS: z.string().optional().default(''),
+  EMAIL_FROM: z.string().optional().default('"TaskFlow Pro" <noreply@taskflowpro.local>'),
 });
 
 // Allow standalone in-memory demo mode if explicitly enabled

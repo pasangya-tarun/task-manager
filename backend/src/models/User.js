@@ -39,12 +39,41 @@ const userSchema = new mongoose.Schema(
       type: Boolean,
       default: true,
     },
+    isEmailVerified: {
+      type: Boolean,
+      default: false,
+      index: true,
+    },
+    emailOtpHash: {
+      type: String,
+      select: false,
+      default: null,
+    },
+    emailOtpExpiresAt: {
+      type: Date,
+      select: false,
+      default: null,
+    },
+    emailOtpAttempts: {
+      type: Number,
+      select: false,
+      default: 0,
+    },
+    emailOtpLastSentAt: {
+      type: Date,
+      select: false,
+      default: null,
+    },
   },
   {
     timestamps: true,
     toJSON: {
       transform(doc, ret) {
         delete ret.passwordHash;
+        delete ret.emailOtpHash;
+        delete ret.emailOtpExpiresAt;
+        delete ret.emailOtpAttempts;
+        delete ret.emailOtpLastSentAt;
         delete ret.__v;
         return ret;
       },
@@ -52,6 +81,10 @@ const userSchema = new mongoose.Schema(
     toObject: {
       transform(doc, ret) {
         delete ret.passwordHash;
+        delete ret.emailOtpHash;
+        delete ret.emailOtpExpiresAt;
+        delete ret.emailOtpAttempts;
+        delete ret.emailOtpLastSentAt;
         delete ret.__v;
         return ret;
       },

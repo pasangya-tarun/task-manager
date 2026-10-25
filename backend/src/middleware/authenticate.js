@@ -51,6 +51,17 @@ const authenticate = async (req, res, next) => {
       );
     }
 
+    // Email verification check
+    if (!user.isEmailVerified) {
+      return errorResponse(
+        res,
+        403,
+        'Please verify your email address to access this resource.',
+        null,
+        { code: 'EMAIL_NOT_VERIFIED', email: user.email }
+      );
+    }
+
     // Attach user to request object
     req.user = user;
     next();

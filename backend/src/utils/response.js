@@ -27,10 +27,11 @@ const successResponse = (res, statusCode = 200, message = 'Success', data = null
  * @param {string} message Error summary message
  * @param {any} [errors] Detailed validation or error breakdown
  */
-const errorResponse = (res, statusCode = 500, message = 'An error occurred', errors = null) => {
+const errorResponse = (res, statusCode = 500, message = 'An error occurred', errors = null, extra = {}) => {
   const response = {
     success: false,
     message,
+    ...extra,
   };
 
   if (errors !== null) {

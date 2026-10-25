@@ -45,10 +45,30 @@ export const AuthProvider = ({ children }) => {
     setAuthError(null);
     try {
       const response = await authService.register(data);
-      setUser(response.data.user);
+      // Registration requires OTP email verification before session is issued
       return response;
     } catch (err) {
       setAuthError(err.message || 'Registration failed');
+      throw err;
+    }
+  };
+
+  const verifyEmail = async ({ email, otp }) => {
+    setAuthError(null);
+    try {
+      const response = await authService.verifyEmail({ email, otp });
+      return response;
+    } catch (err) {
+      setAuthError(err.message || 'Email verification failed');
+      throw err;
+    }
+  };
+
+  const resendOtp = async ({ email }) => {
+    try {
+      const response = await authService.resendOtp({ email });
+      return response;
+    } catch (err) {
       throw err;
     }
   };
@@ -75,6 +95,8 @@ export const AuthProvider = ({ children }) => {
     isAdmin: user?.role === 'admin',
     login,
     register,
+    verifyEmail,
+    resendOtp,
     logout,
     checkAuth,
     updateUserInState,

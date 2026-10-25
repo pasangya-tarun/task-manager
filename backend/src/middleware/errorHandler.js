@@ -59,11 +59,17 @@ const errorHandler = (err, req, res, next) => {
     console.error('Unhandled Server Error:', err);
   }
 
+  const extra = {};
+  if (err.code) extra.code = err.code;
+  if (err.email) extra.email = err.email;
+  if (err.remainingSeconds !== undefined) extra.remainingSeconds = err.remainingSeconds;
+
   return errorResponse(
     res,
     statusCode,
     message,
-    !isProduction && err.stack ? { stack: err.stack } : null
+    !isProduction && err.stack ? { stack: err.stack } : null,
+    extra
   );
 };
 

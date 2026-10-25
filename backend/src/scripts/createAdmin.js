@@ -41,6 +41,7 @@ const run = async () => {
       } else {
         existingUser.role = 'admin';
         existingUser.isActive = true;
+        existingUser.isEmailVerified = true;
         await existingUser.save();
         console.log(`✅ Existing user "${email}" has been successfully promoted to "admin".`);
       }
@@ -52,6 +53,7 @@ const run = async () => {
         passwordHash,
         role: 'admin',
         isActive: true,
+        isEmailVerified: true,
       });
 
       console.log('====================================================');

@@ -1,4 +1,5 @@
 const Task = require('../models/Task');
+const Notification = require('../models/Notification');
 
 /**
  * Escapes regex special characters to prevent ReDoS attacks in search queries
@@ -141,6 +142,9 @@ class TaskService {
       error.statusCode = 404;
       throw error;
     }
+
+    // Cascade cleanup: remove notifications referencing the deleted task to prevent orphan links
+    await Notification.deleteMany({ task: taskId });
 
     return { id: taskId };
   }

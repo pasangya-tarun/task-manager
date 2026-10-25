@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import taskService from '../services/taskService';
 import DashboardSummary from '../components/DashboardSummary';
 import TaskFilters from '../components/TaskFilters';
@@ -72,6 +73,9 @@ const Dashboard = () => {
     }
   }, [page, search, status, priority, sortBy, sortOrder]);
 
+  const [searchParams, setSearchParams] = useSearchParams();
+  const targetTaskId = searchParams.get('taskId');
+
   useEffect(() => {
     fetchStats();
   }, [fetchStats]);
@@ -79,6 +83,30 @@ const Dashboard = () => {
   useEffect(() => {
     fetchTasks();
   }, [fetchTasks]);
+
+  useEffect(() => {
+    if (targetTaskId) {
+      const handleTargetTask = async () => {
+        try {
+          const el = document.getElementById(`task-card-${targetTaskId}`);
+          if (el) {
+            el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            el.classList.add('task-card-highlighted');
+            setTimeout(() => el.classList.remove('task-card-highlighted'), 3000);
+          } else {
+            const res = await taskService.getTaskById(targetTaskId);
+            if (res.data) {
+              setEditingTask(res.data);
+              setIsModalOpen(true);
+            }
+          }
+        } catch (err) {
+          console.warn('Could not focus target task:', err);
+        }
+      };
+      handleTargetTask();
+    }
+  }, [targetTaskId, tasks]);
 
   const handleResetFilters = () => {
     setSearch('');

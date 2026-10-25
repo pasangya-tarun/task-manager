@@ -38,7 +38,30 @@ const loginSchema = z.object({
     .min(1, 'Password cannot be empty'),
 });
 
+const verifyEmailSchema = z.object({
+  email: z
+    .string({ required_error: 'Email is required' })
+    .trim()
+    .toLowerCase()
+    .email('Please provide a valid email address'),
+  otp: z
+    .string({ required_error: 'Verification code is required' })
+    .trim()
+    .length(6, 'Verification code must be exactly 6 digits')
+    .regex(/^\d{6}$/, 'Verification code must contain only numbers'),
+});
+
+const resendOtpSchema = z.object({
+  email: z
+    .string({ required_error: 'Email is required' })
+    .trim()
+    .toLowerCase()
+    .email('Please provide a valid email address'),
+});
+
 module.exports = {
   registerSchema,
   loginSchema,
+  verifyEmailSchema,
+  resendOtpSchema,
 };

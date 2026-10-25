@@ -6,12 +6,40 @@ class AuthController {
   async register(req, res, next) {
     try {
       const { name, email, password } = req.body;
-      const { user, token } = await authService.register({ name, email, password });
+      const result = await authService.register({ name, email, password });
 
-      // Preferred browser implementation: store JWT in HttpOnly cookie
-      setAuthCookie(res, token);
+      // Do NOT set auth cookie before email verification
+      return successResponse(res, 201, result.message, {
+        user: result.user,
+        isEmailVerified: false,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
 
-      return successResponse(res, 201, 'Registration successful', { user, token });
+  async verifyEmail(req, res, next) {
+    try {
+      const { email, otp } = req.body;
+      const result = await authService.verifyEmail({ email, otp });
+
+      return successResponse(res, 200, result.message, {
+        user: result.user,
+        alreadyVerified: result.alreadyVerified,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async resendOtp(req, res, next) {
+    try {
+      const { email } = req.body;
+      const result = await authService.resendOtp({ email });
+
+      return successResponse(res, 200, result.message, {
+        alreadyVerified: result.alreadyVerified,
+      });
     } catch (error) {
       next(error);
     }
@@ -22,7 +50,7 @@ class AuthController {
       const { email, password } = req.body;
       const { user, token } = await authService.login({ email, password });
 
-      // Preferred browser implementation: store JWT in HttpOnly cookie
+      // Store JWT in HttpOnly cookie upon successful login for verified accounts
       setAuthCookie(res, token);
 
       return successResponse(res, 200, 'Login successful', { user, token });

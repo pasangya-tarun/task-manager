@@ -1,6 +1,7 @@
 const app = require('./app');
 const env = require('./config/env');
 const { connectDB } = require('./config/database');
+const { startReminderScheduler, stopReminderScheduler } = require('./services/reminderScheduler');
 
 const startServer = async () => {
   try {
@@ -19,6 +20,7 @@ const startServer = async () => {
           passwordHash,
           role: 'admin',
           isActive: true,
+          isEmailVerified: true,
         });
         console.log('ℹ️ [DEMO MODE] Initialized demo admin account: admin@taskmanager.local / Admin@123456');
       }
@@ -27,11 +29,14 @@ const startServer = async () => {
     const server = app.listen(env.PORT, () => {
       console.log(`🚀 Task Manager API Server running on port ${env.PORT} [${env.NODE_ENV}]`);
       console.log(`📡 Client URL allowed: ${env.CLIENT_URL}`);
+      // Initialize automatic task reminder scheduler
+      startReminderScheduler();
     });
 
     // Graceful shutdown handling
     const shutdown = async (signal) => {
       console.log(`\n🛑 Received ${signal}. Gracefully shutting down...`);
+      stopReminderScheduler();
       server.close(async () => {
         const { disconnectDB } = require('./config/database');
         await disconnectDB();

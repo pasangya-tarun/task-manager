@@ -36,8 +36,16 @@ const Register = () => {
     setLoading(true);
 
     try {
-      await register({ name, email, password, confirmPassword });
-      navigate('/dashboard', { replace: true });
+      const normalizedEmail = email.toLowerCase().trim();
+      const res = await register({ name, email: normalizedEmail, password, confirmPassword });
+      sessionStorage.setItem('pending_verification_email', normalizedEmail);
+      navigate('/verify-email', {
+        replace: true,
+        state: {
+          email: normalizedEmail,
+          message: res.message || 'Please enter the 6-digit code sent to your email to activate your account.',
+        },
+      });
     } catch (err) {
       setError(err.message || 'Registration failed');
     } finally {

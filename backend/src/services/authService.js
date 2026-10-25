@@ -1,11 +1,13 @@
 const User = require('../models/User');
 const { generateToken } = require('../utils/token');
+const { generateNumericOtp, hashOtp, verifyOtpHash } = require('../utils/otp');
+const emailService = require('./emailService');
 
 class AuthService {
   /**
-   * Register a new regular user account
+   * Register a new user account with unverified status and generate 6-digit OTP
    * @param {Object} param0 
-   * @returns {Promise<{ user: Object, token: string }>}
+   * @returns {Promise<{ user: Object, message: string }>}
    */
   async register({ name, email, password }) {
     const normalizedEmail = email.toLowerCase().trim();
@@ -13,33 +15,220 @@ class AuthService {
     // Check for existing user
     const existingUser = await User.findOne({ email: normalizedEmail });
     if (existingUser) {
-      const error = new Error('An account with this email already exists');
-      error.statusCode = 409;
-      throw error;
+      if (existingUser.isEmailVerified) {
+        const error = new Error('An account with this email already exists');
+        error.statusCode = 409;
+        throw error;
+      }
+
+      // If user registered earlier but never completed email verification,
+      // allow updating credentials and reissue a fresh OTP
+      const otp = generateNumericOtp();
+      const passwordHash = await User.hashPassword(password);
+
+      existingUser.name = name.trim();
+      existingUser.passwordHash = passwordHash;
+      existingUser.emailOtpHash = hashOtp(otp);
+      existingUser.emailOtpExpiresAt = new Date(Date.now() + 10 * 60 * 1000);
+      existingUser.emailOtpAttempts = 0;
+      existingUser.emailOtpLastSentAt = new Date();
+      await existingUser.save();
+
+      // Dispatch OTP email
+      await emailService.sendOtpEmail({
+        to: normalizedEmail,
+        name: existingUser.name,
+        otp,
+        expiresInMinutes: 10,
+      });
+
+      return {
+        user: existingUser.toJSON(),
+        message: 'Registration recorded. A 6-digit verification code has been sent to your email.',
+      };
     }
 
-    // Hash password with bcrypt
+    // Generate new secure 6-digit numeric OTP
+    const otp = generateNumericOtp();
     const passwordHash = await User.hashPassword(password);
 
-    // Always enforce 'user' role on public registration
+    // Create user with isEmailVerified: false
     const user = await User.create({
       name: name.trim(),
       email: normalizedEmail,
       passwordHash,
       role: 'user',
       isActive: true,
+      isEmailVerified: false,
+      emailOtpHash: hashOtp(otp),
+      emailOtpExpiresAt: new Date(Date.now() + 10 * 60 * 1000), // 10 minutes expiry
+      emailOtpAttempts: 0,
+      emailOtpLastSentAt: new Date(),
     });
 
-    const token = generateToken(user);
+    // Send verification email
+    await emailService.sendOtpEmail({
+      to: normalizedEmail,
+      name: user.name,
+      otp,
+      expiresInMinutes: 10,
+    });
 
+    // Do NOT issue an authenticated session or JWT before email verification
     return {
       user: user.toJSON(),
-      token,
+      message: 'Registration successful. A 6-digit verification code has been sent to your email.',
     };
   }
 
   /**
-   * Authenticate user credentials and return session token
+   * Verify email using 6-digit OTP with rate limiting and atomic updates
+   * @param {Object} param0 
+   * @returns {Promise<{ message: string, user?: Object, alreadyVerified?: boolean }>}
+   */
+  async verifyEmail({ email, otp }) {
+    const normalizedEmail = email.toLowerCase().trim();
+
+    const user = await User.findOne({ email: normalizedEmail }).select(
+      '+emailOtpHash +emailOtpExpiresAt +emailOtpAttempts'
+    );
+
+    if (!user) {
+      const error = new Error('Invalid email or verification code');
+      error.statusCode = 400;
+      throw error;
+    }
+
+    if (user.isEmailVerified) {
+      return {
+        message: 'Email is already verified. You can now log in.',
+        alreadyVerified: true,
+      };
+    }
+
+    // Maximum attempts check (e.g. 5 attempts)
+    if (user.emailOtpAttempts >= 5) {
+      const error = new Error('Maximum verification attempts exceeded. Please request a new verification code.');
+      error.statusCode = 400;
+      throw error;
+    }
+
+    // Expiration check (10 minutes)
+    if (!user.emailOtpExpiresAt || new Date() > user.emailOtpExpiresAt) {
+      const error = new Error('Verification code has expired. Please request a new code.');
+      error.statusCode = 400;
+      throw error;
+    }
+
+    // Secure constant-time hash verification
+    const isValid = verifyOtpHash(otp, user.emailOtpHash);
+    if (!isValid) {
+      await User.updateOne({ _id: user._id }, { $inc: { emailOtpAttempts: 1 } });
+      const remainingAttempts = Math.max(0, 5 - (user.emailOtpAttempts + 1));
+      const message = remainingAttempts > 0
+        ? `Invalid verification code. ${remainingAttempts} attempt(s) remaining.`
+        : 'Maximum verification attempts exceeded. Please request a new verification code.';
+      const error = new Error(message);
+      error.statusCode = 400;
+      throw error;
+    }
+
+    // Atomic update to mark verified and clear OTP metadata protecting against concurrent reuse
+    const updatedUser = await User.findOneAndUpdate(
+      { _id: user._id, isEmailVerified: false, emailOtpHash: user.emailOtpHash },
+      {
+        $set: {
+          isEmailVerified: true,
+          emailOtpHash: null,
+          emailOtpExpiresAt: null,
+          emailOtpAttempts: 0,
+          emailOtpLastSentAt: null,
+        },
+      },
+      { new: true }
+    );
+
+    if (!updatedUser) {
+      const checkUser = await User.findById(user._id);
+      if (checkUser && checkUser.isEmailVerified) {
+        return {
+          message: 'Email verified successfully. You can now log in.',
+          user: checkUser.toJSON(),
+        };
+      }
+      const error = new Error('Verification code was already used or invalidated.');
+      error.statusCode = 400;
+      throw error;
+    }
+
+    return {
+      message: 'Email verified successfully! You can now log in.',
+      user: updatedUser.toJSON(),
+    };
+  }
+
+  /**
+   * Resend verification OTP enforcing 60-second cooldown
+   * @param {Object} param0 
+   * @returns {Promise<{ message: string, alreadyVerified?: boolean }>}
+   */
+  async resendOtp({ email }) {
+    const normalizedEmail = email.toLowerCase().trim();
+
+    const user = await User.findOne({ email: normalizedEmail }).select(
+      '+emailOtpLastSentAt +emailOtpHash'
+    );
+
+    // Mitigate account enumeration: respond generically if user not found
+    if (!user) {
+      return {
+        message: 'If an unverified account exists with this email, a new verification code has been sent.',
+      };
+    }
+
+    if (user.isEmailVerified) {
+      return {
+        message: 'This email is already verified. You can log in directly.',
+        alreadyVerified: true,
+      };
+    }
+
+    // Enforce 60-second cooldown
+    const COOLDOWN_SECONDS = 60;
+    if (user.emailOtpLastSentAt) {
+      const elapsedMs = Date.now() - new Date(user.emailOtpLastSentAt).getTime();
+      if (elapsedMs < COOLDOWN_SECONDS * 1000) {
+        const remaining = Math.ceil((COOLDOWN_SECONDS * 1000 - elapsedMs) / 1000);
+        const error = new Error(`Please wait ${remaining} seconds before requesting a new code.`);
+        error.statusCode = 429;
+        error.remainingSeconds = remaining;
+        throw error;
+      }
+    }
+
+    // Generate new OTP and reset attempts
+    const otp = generateNumericOtp();
+    user.emailOtpHash = hashOtp(otp);
+    user.emailOtpExpiresAt = new Date(Date.now() + 10 * 60 * 1000);
+    user.emailOtpAttempts = 0;
+    user.emailOtpLastSentAt = new Date();
+    await user.save();
+
+    // Dispatch email
+    await emailService.sendOtpEmail({
+      to: normalizedEmail,
+      name: user.name,
+      otp,
+      expiresInMinutes: 10,
+    });
+
+    return {
+      message: 'A new verification code has been sent to your email.',
+    };
+  }
+
+  /**
+   * Authenticate user credentials and return session token (rejects unverified accounts)
    * @param {Object} param0 
    * @returns {Promise<{ user: Object, token: string }>}
    */
@@ -67,6 +256,15 @@ class AuthService {
     if (!isPasswordValid) {
       const error = new Error('Invalid email or password');
       error.statusCode = 401;
+      throw error;
+    }
+
+    // Check email verification status
+    if (!user.isEmailVerified) {
+      const error = new Error('Please verify your email address before logging in.');
+      error.statusCode = 403;
+      error.code = 'EMAIL_NOT_VERIFIED';
+      error.email = user.email;
       throw error;
     }
 

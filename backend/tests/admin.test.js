@@ -14,6 +14,7 @@ describe('Admin User Management & Role Authorization Suite', () => {
       passwordHash: await User.hashPassword('Password123!'),
       role: 'user',
       isActive: true,
+      isEmailVerified: true,
     });
 
     adminUser = await User.create({
@@ -22,6 +23,7 @@ describe('Admin User Management & Role Authorization Suite', () => {
       passwordHash: await User.hashPassword('Password123!'),
       role: 'admin',
       isActive: true,
+      isEmailVerified: true,
     });
 
     secondaryAdminUser = await User.create({
@@ -30,6 +32,7 @@ describe('Admin User Management & Role Authorization Suite', () => {
       passwordHash: await User.hashPassword('Password123!'),
       role: 'admin',
       isActive: true,
+      isEmailVerified: true,
     });
 
     regularToken = generateToken(regularUser);

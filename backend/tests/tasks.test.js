@@ -17,6 +17,7 @@ describe('Task Management & Ownership Isolation Suite', () => {
       passwordHash: await User.hashPassword('Password123!'),
       role: 'user',
       isActive: true,
+      isEmailVerified: true,
     });
 
     userB = await User.create({
@@ -25,6 +26,7 @@ describe('Task Management & Ownership Isolation Suite', () => {
       passwordHash: await User.hashPassword('Password123!'),
       role: 'user',
       isActive: true,
+      isEmailVerified: true,
     });
 
     tokenA = generateToken(userA);

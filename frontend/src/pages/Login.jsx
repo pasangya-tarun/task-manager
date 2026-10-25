@@ -14,16 +14,24 @@ const Login = () => {
 
   const from = location.state?.from?.pathname || '/dashboard';
 
+  const [unverifiedEmail, setUnverifiedEmail] = useState(null);
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError(null);
+    setUnverifiedEmail(null);
     setLoading(true);
 
     try {
-      await login({ email, password });
+      await login({ email: email.toLowerCase().trim(), password });
       navigate(from, { replace: true });
     } catch (err) {
-      setError(err.message || 'Invalid email or password');
+      if (err.code === 'EMAIL_NOT_VERIFIED' || (err.message && err.message.toLowerCase().includes('verify your email'))) {
+        setUnverifiedEmail(err.email || email.toLowerCase().trim());
+        setError('Your email address is not yet verified. Please enter the verification code sent to your email.');
+      } else {
+        setError(err.message || 'Invalid email or password');
+      }
     } finally {
       setLoading(false);
     }
@@ -63,13 +71,26 @@ const Login = () => {
         {error && (
           <div className="form-error" style={{
             marginBottom: '1.5rem',
-            padding: '0.75rem 1rem',
+            padding: '0.85rem 1rem',
             background: 'rgba(239, 68, 68, 0.12)',
             border: '1px solid rgba(239, 68, 68, 0.3)',
             borderRadius: 'var(--radius-md)',
-            color: '#fca5a5'
+            color: '#fca5a5',
+            lineHeight: 1.5,
           }}>
-            ⚠️ {error}
+            <div style={{ marginBottom: unverifiedEmail ? '0.75rem' : 0 }}>
+              ⚠️ {error}
+            </div>
+            {unverifiedEmail && (
+              <Link
+                to={`/verify-email?email=${encodeURIComponent(unverifiedEmail)}`}
+                className="btn btn-primary btn-sm"
+                id="link-verify-unverified"
+                style={{ width: '100%', textAlign: 'center', display: 'inline-block' }}
+              >
+                Verify Email Now →
+              </Link>
+            )}
           </div>
         )}
 
