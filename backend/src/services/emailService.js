@@ -63,6 +63,64 @@ class EmailService {
   }
 
   /**
+   * Dispatch email via Resend HTTPS REST API (Bypasses cloud hosting SMTP port 465/587 blocks)
+   */
+  async sendViaResend({ to, subject, text, html }) {
+    const res = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${env.RESEND_API_KEY.trim()}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        from: 'TaskFlow Pro <onboarding@resend.dev>',
+        to: [to],
+        subject,
+        text,
+        html,
+      }),
+    });
+
+    if (!res.ok) {
+      const errData = await res.text();
+      throw new Error(`Resend API error (${res.status}): ${errData}`);
+    }
+
+    return await res.json();
+  }
+
+  /**
+   * Dispatch email via Brevo HTTPS REST API (Free 300 emails/day, bypasses cloud hosting SMTP blocks)
+   */
+  async sendViaBrevo({ to, name, subject, text, html }) {
+    const res = await fetch('https://api.brevo.com/v3/smtp/email', {
+      method: 'POST',
+      headers: {
+        'api-key': env.BREVO_API_KEY.trim(),
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+      },
+      body: JSON.stringify({
+        sender: {
+          name: 'TaskFlow Pro',
+          email: env.EMAIL_USER || 'pasangya.tarun@gmail.com',
+        },
+        to: [{ email: to, name: name || 'User' }],
+        subject,
+        htmlContent: html,
+        textContent: text,
+      }),
+    });
+
+    if (!res.ok) {
+      const errData = await res.text();
+      throw new Error(`Brevo API error (${res.status}): ${errData}`);
+    }
+
+    return await res.json();
+  }
+
+  /**
    * Send 6-digit OTP verification email
    * @param {Object} options
    * @param {string} options.to - Recipient email
@@ -123,6 +181,14 @@ The TaskFlow Pro Team`;
     `;
 
     try {
+      if (env.BREVO_API_KEY && process.env.NODE_ENV !== 'test') {
+        return await this.sendViaBrevo({ to, subject, text: textContent, html: htmlContent });
+      }
+
+      if (env.RESEND_API_KEY && process.env.NODE_ENV !== 'test') {
+        return await this.sendViaResend({ to, subject, text: textContent, html: htmlContent });
+      }
+
       const mailOptions = {
         from: env.EMAIL_FROM,
         to,
@@ -226,6 +292,14 @@ The TaskFlow Pro Team`;
     `;
 
     try {
+      if (env.BREVO_API_KEY && process.env.NODE_ENV !== 'test') {
+        return await this.sendViaBrevo({ to, name, subject, text: textContent, html: htmlContent });
+      }
+
+      if (env.RESEND_API_KEY && process.env.NODE_ENV !== 'test') {
+        return await this.sendViaResend({ to, subject, text: textContent, html: htmlContent });
+      }
+
       const mailOptions = {
         from: env.EMAIL_FROM,
         to,

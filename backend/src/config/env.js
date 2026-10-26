@@ -26,6 +26,8 @@ const envSchema = z.object({
   EMAIL_USER: z.string().optional().default(''),
   EMAIL_PASS: z.string().optional().default(''),
   EMAIL_FROM: z.string().optional().default('"TaskFlow Pro" <noreply@taskflowpro.local>'),
+  RESEND_API_KEY: z.string().optional().default(''),
+  BREVO_API_KEY: z.string().optional().default(''),
 });
 
 // Allow standalone in-memory demo mode if explicitly enabled
