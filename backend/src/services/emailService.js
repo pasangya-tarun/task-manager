@@ -93,6 +93,7 @@ class EmailService {
    * Dispatch email via Brevo HTTPS REST API (Free 300 emails/day, bypasses cloud hosting SMTP blocks)
    */
   async sendViaBrevo({ to, name, subject, text, html }) {
+    const senderEmail = env.BREVO_SENDER_EMAIL || env.EMAIL_USER || 'pasangya.tarun@gmail.com';
     const res = await fetch('https://api.brevo.com/v3/smtp/email', {
       method: 'POST',
       headers: {
@@ -103,7 +104,7 @@ class EmailService {
       body: JSON.stringify({
         sender: {
           name: 'TaskFlow Pro',
-          email: env.EMAIL_USER || 'pasangya.tarun@gmail.com',
+          email: senderEmail.trim(),
         },
         to: [{ email: to, name: name || 'User' }],
         subject,
@@ -202,15 +203,10 @@ The TaskFlow Pro Team`;
     } catch (error) {
       console.error(`Failed to dispatch verification email to ${to}:`, error.message);
 
-      const isConnectionIssue =
-        error.message?.includes('timeout') ||
-        error.code === 'ETIMEDOUT' ||
-        error.code === 'ECONNECTION' ||
-        error.code === 'ESOCKET';
-
-      if (isConnectionIssue && process.env.NODE_ENV !== 'test') {
+      if (process.env.NODE_ENV !== 'test') {
         console.warn('================================================================================');
-        console.warn('[Render Cloud Alert]: Outbound SMTP port blocked by cloud hosting firewall.');
+        console.warn('[Cloud Delivery Notice]: Live email could not be dispatched.');
+        console.warn(`Reason: ${error.message}`);
         console.warn(`[Generated Verification OTP for ${to}]: ${otp}`);
         console.warn('================================================================================');
         return { messageId: 'cloud-fallback-otp-logged', otp };
@@ -313,15 +309,10 @@ The TaskFlow Pro Team`;
     } catch (error) {
       console.error(`Failed to dispatch password reset email to ${to}:`, error.message);
 
-      const isConnectionIssue =
-        error.message?.includes('timeout') ||
-        error.code === 'ETIMEDOUT' ||
-        error.code === 'ECONNECTION' ||
-        error.code === 'ESOCKET';
-
-      if (isConnectionIssue && process.env.NODE_ENV !== 'test') {
+      if (process.env.NODE_ENV !== 'test') {
         console.warn('================================================================================');
-        console.warn('[Render Cloud Alert]: Outbound SMTP port blocked by cloud hosting firewall.');
+        console.warn('[Cloud Delivery Notice]: Live password reset email could not be dispatched.');
+        console.warn(`Reason: ${error.message}`);
         console.warn(`[Generated Password Reset Link for ${to}]:`);
         console.warn(`${resetUrl}`);
         console.warn('================================================================================');
