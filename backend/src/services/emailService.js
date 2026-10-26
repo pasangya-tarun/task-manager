@@ -12,18 +12,37 @@ class EmailService {
     if (env.EMAIL_HOST && env.EMAIL_USER && env.EMAIL_PASS) {
       const user = env.EMAIL_USER.trim();
       const pass = env.EMAIL_PASS.trim();
-      const isSecure = env.EMAIL_SECURE || env.EMAIL_PORT === 465;
+      const host = env.EMAIL_HOST.trim().toLowerCase();
+      const isGmail = host.includes('gmail');
 
-      this.transporter = nodemailer.createTransport({
-        host: env.EMAIL_HOST.trim(),
-        port: env.EMAIL_PORT,
-        secure: isSecure, // true for 465, false for 587 / STARTTLS
-        auth: {
-          user,
-          pass,
-        },
-        family: 4, // prioritize IPv4 to prevent IPv6 DNS routing delays
-      });
+      if (isGmail) {
+        // Use Nodemailer's built-in Gmail service to prevent Render cloud port 587 STARTTLS timeouts
+        this.transporter = nodemailer.createTransport({
+          service: 'gmail',
+          auth: {
+            user,
+            pass,
+          },
+          family: 4,
+          connectionTimeout: 15000,
+          greetingTimeout: 15000,
+        });
+      } else {
+        const isSecure = env.EMAIL_SECURE || env.EMAIL_PORT === 465;
+
+        this.transporter = nodemailer.createTransport({
+          host: env.EMAIL_HOST.trim(),
+          port: env.EMAIL_PORT,
+          secure: isSecure, // true for 465, false for 587 / STARTTLS
+          auth: {
+            user,
+            pass,
+          },
+          family: 4,
+          connectionTimeout: 15000,
+          greetingTimeout: 15000,
+        });
+      }
     } else {
       // In development or test without configured SMTP credentials, use a stub/stream transport
       this.transporter = nodemailer.createTransport({
