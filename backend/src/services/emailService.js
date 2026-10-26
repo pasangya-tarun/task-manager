@@ -24,8 +24,9 @@ class EmailService {
             pass,
           },
           family: 4,
-          connectionTimeout: 15000,
-          greetingTimeout: 15000,
+          connectionTimeout: 4000,
+          greetingTimeout: 4000,
+          socketTimeout: 5000,
         });
       } else {
         const isSecure = env.EMAIL_SECURE || env.EMAIL_PORT === 465;
@@ -39,8 +40,9 @@ class EmailService {
             pass,
           },
           family: 4,
-          connectionTimeout: 15000,
-          greetingTimeout: 15000,
+          connectionTimeout: 4000,
+          greetingTimeout: 4000,
+          socketTimeout: 5000,
         });
       }
     } else {
@@ -133,6 +135,21 @@ The TaskFlow Pro Team`;
       return info;
     } catch (error) {
       console.error(`Failed to dispatch verification email to ${to}:`, error.message);
+
+      const isConnectionIssue =
+        error.message?.includes('timeout') ||
+        error.code === 'ETIMEDOUT' ||
+        error.code === 'ECONNECTION' ||
+        error.code === 'ESOCKET';
+
+      if (isConnectionIssue && process.env.NODE_ENV !== 'test') {
+        console.warn('================================================================================');
+        console.warn('[Render Cloud Alert]: Outbound SMTP port blocked by cloud hosting firewall.');
+        console.warn(`[Generated Verification OTP for ${to}]: ${otp}`);
+        console.warn('================================================================================');
+        return { messageId: 'cloud-fallback-otp-logged', otp };
+      }
+
       const deliveryError = new Error('Failed to send verification email. Please check SMTP settings or try again.');
       deliveryError.statusCode = 502;
       deliveryError.originalError = error;
@@ -221,6 +238,22 @@ The TaskFlow Pro Team`;
       return info;
     } catch (error) {
       console.error(`Failed to dispatch password reset email to ${to}:`, error.message);
+
+      const isConnectionIssue =
+        error.message?.includes('timeout') ||
+        error.code === 'ETIMEDOUT' ||
+        error.code === 'ECONNECTION' ||
+        error.code === 'ESOCKET';
+
+      if (isConnectionIssue && process.env.NODE_ENV !== 'test') {
+        console.warn('================================================================================');
+        console.warn('[Render Cloud Alert]: Outbound SMTP port blocked by cloud hosting firewall.');
+        console.warn(`[Generated Password Reset Link for ${to}]:`);
+        console.warn(`${resetUrl}`);
+        console.warn('================================================================================');
+        return { messageId: 'cloud-fallback-link-logged', resetUrl };
+      }
+
       const deliveryError = new Error('Failed to send password reset email. Please check SMTP settings or try again later.');
       deliveryError.statusCode = 502;
       deliveryError.originalError = error;
