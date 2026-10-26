@@ -346,15 +346,15 @@ describe('Forgot Password & Reset Password Workflow Suite', () => {
     it('12: enforces rate limiting on password reset endpoint when header is present', async () => {
       await createVerifiedUser();
 
-      // Send 5 rapid requests with x-test-rate-limit header (limiter max is 5)
-      for (let i = 0; i < 5; i++) {
+      // Send 20 rapid requests with x-test-rate-limit header (limiter max is 20)
+      for (let i = 0; i < 20; i++) {
         await request(app)
           .post('/api/auth/forgot-password')
           .set('x-test-rate-limit', 'true')
           .send({ email: testUser.email });
       }
 
-      // 6th request should hit rate limit
+      // 21st request should hit rate limit
       const rateLimitedRes = await request(app)
         .post('/api/auth/forgot-password')
         .set('x-test-rate-limit', 'true')

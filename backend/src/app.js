@@ -18,13 +18,35 @@ const app = express();
 // Security HTTP headers
 app.use(helmet());
 
-// Credentialed CORS configuration with explicit allowed origin
+// Credentialed CORS configuration with multi-origin and Vercel support
+const allowedOrigins = [
+  env.CLIENT_URL,
+  env.FRONTEND_URL,
+  'https://task-manager-livid-theta.vercel.app',
+  'http://localhost:5173',
+  'http://localhost:3000',
+].filter(Boolean);
+
 app.use(
   cors({
-    origin: env.CLIENT_URL,
+    origin: (origin, callback) => {
+      // Allow requests with no origin (curl, same-origin, or server-side calls)
+      if (!origin) return callback(null, true);
+
+      // Allow configured origins, any vercel.app deployment, or local development
+      if (
+        allowedOrigins.includes(origin) ||
+        origin.endsWith('.vercel.app') ||
+        origin.includes('localhost')
+      ) {
+        return callback(null, origin);
+      }
+
+      return callback(null, false);
+    },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
   })
 );
 

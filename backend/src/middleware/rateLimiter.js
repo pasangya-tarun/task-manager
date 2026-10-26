@@ -23,7 +23,7 @@ const authLimiter = rateLimit({
 // Dedicated strict rate limiter for password reset endpoints
 const passwordResetLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 5,
+  max: 20,
   standardHeaders: true,
   legacyHeaders: false,
   handler: (req, res) => {
