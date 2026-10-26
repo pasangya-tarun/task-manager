@@ -59,9 +59,47 @@ const resendOtpSchema = z.object({
     .email('Please provide a valid email address'),
 });
 
+const forgotPasswordSchema = z.object({
+  email: z
+    .string({ required_error: 'Email is required' })
+    .trim()
+    .toLowerCase()
+    .email('Please provide a valid email address'),
+});
+
+const resetPasswordSchema = z
+  .object({
+    token: z
+      .string({ required_error: 'Reset token is required' })
+      .trim()
+      .min(1, 'Reset token cannot be empty'),
+    password: z
+      .string({ required_error: 'Password is required' })
+      .min(8, 'Password must be at least 8 characters long')
+      .regex(
+        /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/,
+        'Password must contain at least one uppercase letter, one lowercase letter, and one number'
+      ),
+    confirmPassword: z.string().optional(),
+  })
+  .refine(
+    (data) => {
+      if (data.confirmPassword !== undefined && data.confirmPassword !== '') {
+        return data.password === data.confirmPassword;
+      }
+      return true;
+    },
+    {
+      message: 'Passwords do not match',
+      path: ['confirmPassword'],
+    }
+  );
+
 module.exports = {
   registerSchema,
   loginSchema,
   verifyEmailSchema,
   resendOtpSchema,
+  forgotPasswordSchema,
+  resetPasswordSchema,
 };

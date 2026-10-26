@@ -17,6 +17,14 @@ export const authService = {
     return api.post('/auth/login', credentials);
   },
 
+  async forgotPassword({ email }) {
+    return api.post('/auth/forgot-password', { email });
+  },
+
+  async resetPassword({ token, password, confirmPassword }) {
+    return api.post('/auth/reset-password', { token, password, confirmPassword });
+  },
+
   async logout() {
     return api.post('/auth/logout');
   },

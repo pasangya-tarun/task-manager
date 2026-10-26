@@ -11,6 +11,7 @@ const envSchema = z.object({
     required_error: 'MONGODB_URI is required. Please check your .env configuration.',
   }).min(1, 'MONGODB_URI cannot be empty').transform((val) => val.replace(/^MONGODB_URI=/, '').trim()),
   CLIENT_URL: z.string().default('http://localhost:5173'),
+  FRONTEND_URL: z.string().optional().default('http://localhost:5173'),
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
   JWT_SECRET: z.string({
     required_error: 'JWT_SECRET is required. Provide a secure random secret in .env.',
@@ -37,6 +38,9 @@ if (process.env.USE_IN_MEMORY_DB === 'true') {
 let envConfig;
 try {
   envConfig = envSchema.parse(process.env);
+  if (!process.env.FRONTEND_URL && envConfig.CLIENT_URL) {
+    envConfig.FRONTEND_URL = envConfig.CLIENT_URL;
+  }
 } catch (error) {
   if (process.env.NODE_ENV !== 'test') {
     if (error instanceof z.ZodError) {
@@ -54,6 +58,7 @@ try {
       PORT: 5001,
       MONGODB_URI: process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/task_manager_test',
       CLIENT_URL: 'http://localhost:5173',
+      FRONTEND_URL: process.env.FRONTEND_URL || process.env.CLIENT_URL || 'http://localhost:5173',
       NODE_ENV: 'test',
       JWT_SECRET: process.env.JWT_SECRET || 'test_jwt_secret_must_be_at_least_16_chars_long',
       JWT_EXPIRES_IN: '15m',

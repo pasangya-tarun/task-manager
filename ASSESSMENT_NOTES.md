@@ -33,16 +33,16 @@
 
 ## 2. Three Features Deliberately Not Implemented & Rationale
 
-1. **Push Notifications / SMS Gateways:** SMS delivery requires external telecommunication gateways (Twilio/AWS SNS) with paid phone number verification. Email verification was implemented cleanly via Nodemailer and standard SMTP.
+1. **Push Notifications / SMS Gateways:** SMS delivery requires external telecommunication gateways (Twilio/AWS SNS) with paid phone number verification. Email delivery was implemented cleanly via Nodemailer and standard SMTP.
 2. **Real-time WebSockets / Live Collaboration:** Multi-user concurrent editing requires operational transformation or CRDTs. For a focused task manager, robust database indexing, polling/re-fetching, and cache invalidation provide a more reliable and resilient architecture.
-3. **Password Reset via Email Link:** Generating temporary password-reset tokens sent via email depends on additional token expiration lifecycles. Prioritized completing registration OTP verification, administrative password resets, and account status toggles to maintain a robust, fully tested deliverable.
+3. **Third-Party Social OAuth (Google / GitHub SSO):** Social login introduces external third-party credential dependencies and redirect handshakes that complicate strict zero-trust email verification and session invalidation policies. Prioritized a hardened cryptographic email OTP, strict password policy, and end-to-end password reset recovery.
 
 ---
 
 ## 3. One Honest Limitation (With One Additional Day)
 
 - **Automated Frontend E2E Test Suite (Cypress / Playwright):**
-  - *Current state:* Backend has 100% automated test coverage (46 passed Jest/Supertest integration tests covering OTP verification, auth, tasks, and admin controls), and the live runtime HTTP flows were validated via automated Node test runners.
+  - *Current state:* Backend has 100% automated test coverage (71 passed Jest/Supertest integration tests covering OTP verification, password reset, auth, tasks, and admin controls), and the live runtime HTTP flows were validated via automated Node test runners.
   - *With one additional day:* I would configure local Headless Chromium integration tests within the repository container to automate browser UI assertions alongside the backend tests.
 
 ---

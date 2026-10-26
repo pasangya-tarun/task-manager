@@ -12,6 +12,7 @@ TaskFlow Pro is a production-conscious, full-stack Task Management application b
 
 ### Key Capabilities:
 - **Email OTP Verification:** Cryptographically secure 6-digit OTP verification upon registration, featuring SHA-256 hash storage, 10-minute expiry, constant-time verification, 60-second resend cooldown, brute-force attempt limits, and unverified account login barriers.
+- **Forgot Password & Secure Password Reset:** Production-grade recovery workflow featuring cryptographically secure 32-byte tokens (`crypto.randomBytes(32)`), SHA-256 hashed token storage, 15-minute expiry, single-use atomic consumption, anti-enumeration generic responses, request cooldowns, rate limiting, and automated session revocation via `tokenVersion`.
 - **Role-Based Access Control (RBAC):** Distinct permissions for **Regular Users** and **Administrators**, enforced at the database and API middleware levels.
 - **Ownership Isolation:** Users can strictly read, modify, and delete only their own tasks. Task owner is derived exclusively from the authenticated session on the server, never accepted from client payloads.
 - **HttpOnly Cookie Authentication:** Short-lived JSON Web Tokens (JWT) stored in secure, HttpOnly cookies with `SameSite` protections, preventing XSS-based token theft (no tokens stored in `localStorage`).
@@ -100,6 +101,7 @@ cp backend/.env.example backend/.env
 | `PORT` | API server listening port | `5000` |
 | `MONGODB_URI` | MongoDB Atlas connection string | `mongodb+srv://<USER>:<PASS>@<HOST>/task_manager_db?retryWrites=true&w=majority` |
 | `CLIENT_URL` | Allowed frontend origin for CORS | `http://localhost:5173` |
+| `FRONTEND_URL` | Trusted frontend origin for constructing reset links | `http://localhost:5173` |
 | `NODE_ENV` | Runtime environment | `development` (or `production`) |
 | `JWT_SECRET` | Secret key for signing JWTs (min 16 chars) | Strong random secret (e.g. `openssl rand -base64 32`) |
 | `JWT_EXPIRES_IN`| Token expiration timeframe | `15m` |
@@ -224,6 +226,14 @@ Base path: `/api`
 - `POST /api/auth/login` — Authenticate and receive HttpOnly cookie (rate-limited).
   - Body: `{ email, password }`
   - Rejection: Unverified accounts return `403 Forbidden` with error code `EMAIL_NOT_VERIFIED` and email payload for seamless client redirection.
+- `POST /api/auth/forgot-password` — Request password reset email (rate-limited).
+  - Body: `{ email }`
+  - Response: `{ status: 'success', message: 'If an account exists for this email address, you will receive instructions to reset your password.' }`
+  - Defenses: Constant anti-enumeration message whether account exists or not; 60s client request cooldown; 15-minute token TTL; SHA-256 hash stored in MongoDB; trusted `FRONTEND_URL` origin link construction.
+- `POST /api/auth/reset-password` — Complete password reset with token (rate-limited).
+  - Body: `{ token, password, confirmPassword? }`
+  - Response: `{ status: 'success', message: 'Password has been reset successfully. You can now log in with your new password.' }`
+  - Defenses: Atomic single-use consumption (`findOneAndUpdate`); automatic revocation of existing active sessions via `tokenVersion`; never issues automatic login session.
 - `POST /api/auth/logout` — Clear authentication cookie.
 - `GET /api/auth/me` — Retrieve current authenticated user profile.
 
@@ -303,6 +313,16 @@ npm test
   - Resend cooldown enforcement (60 seconds) returning 429 status.
   - Rejection of unverified user login attempts returning 403 `EMAIL_NOT_VERIFIED`.
   - Handling of SMTP network/delivery failures returning 502 with safe rollback guidance.
+- **Forgot Password & Reset Password Workflow:**
+  - Account enumeration defense: Identical generic response for registered vs unregistered email addresses.
+  - Strict validation: Rejection of malformed emails and weak or mismatched new passwords.
+  - Cryptographic token generation: 32-byte random hex tokens with SHA-256 hashed MongoDB storage and 15-minute TTL.
+  - Single-use atomic update: `findOneAndUpdate` atomically consumes token and prevents race conditions or double reuse.
+  - Session revocation: Automated `tokenVersion` increment invalidates any existing active JWT sessions.
+  - Rejection of expired and invalid tokens returning standard 400 errors.
+  - Authentication transition: Old password rejected, new password verified, password stored with bcrypt (work factor 10).
+  - Rate limiting: Dedicated endpoint rate limiters blocking abusive request volume (429 status).
+  - SMTP resilience: Safe error logging and token cleanup if mail transport fails.
 - **Task Reminders & In-App Notifications:**
   - Tasks reaching their due date automatically generate `TASK_DUE` reminders for the owner.
   - Future tasks do not trigger reminders prematurely.
@@ -319,8 +339,8 @@ npm test
 - **Admin Safeguards:** Verifies non-admin users receive 403 Forbidden on all `/api/admin/*` routes; verifies that the last active administrator cannot be deactivated or demoted.
 
 **Current Test Results:**
-- **Test Suites:** 4 passed, 4 total (`auth.test.js`, `tasks.test.js`, `notifications.test.js`, `admin.test.js`)
-- **Tests:** 59 passed, 59 total (100% pass rate)
+- **Test Suites:** 5 passed, 5 total (`passwordReset.test.js`, `auth.test.js`, `tasks.test.js`, `notifications.test.js`, `admin.test.js`)
+- **Tests:** 71 passed, 71 total (100% pass rate)
 
 ---
 
@@ -328,14 +348,16 @@ npm test
 
 1. **Zero-Session Registration & Verification Barrier:** Registering does not issue an access token or session cookie. Accounts remain locked out of protected APIs and login until verified.
 2. **Cryptographic OTP Security:** OTPs are generated using Node.js `crypto.randomInt(100000, 1000000)`. Only a SHA-256 hash of the OTP is persisted to MongoDB. Raw OTP values are never stored in the database or written to server logs.
-3. **Timing-Safe Verification:** OTP verification uses `crypto.timingSafeEqual` over fixed-length hex digests to eliminate timing side-channel attacks.
-4. **Atomic Single-Use Update:** OTP verification uses Mongoose `findOneAndUpdate` with an atomic filter `{ _id: user._id, isEmailVerified: false, emailOtpHash: hash }` ensuring an OTP can never be validated more than once across concurrent threads.
-5. **No Dangerous TTL Account Deletion:** Rather than using MongoDB TTL indices that could delete the entire user document upon OTP expiration, expiration is verified at application runtime via `emailOtpExpiresAt`.
-6. **Anti-Enumeration Resend Responses:** Resending OTP returns generic success messages even if an unverified account is not found.
-7. **HttpOnly Cookies over LocalStorage:** JWT access tokens are stored in `HttpOnly`, `SameSite=lax`, `Secure` cookies. No JWTs or sensitive credentials are ever placed in `localStorage`.
-8. **Server-Derived Ownership:** Client payloads cannot specify or override the `owner` field on tasks. The backend derives the user ID from `req.user._id` and queries MongoDB using `{ _id: taskId, owner: req.user._id }`.
-9. **Last Active Administrator Safeguard:** The backend checks the count of active administrators before allowing any admin deactivation or role demotion.
-10. **Information Disclosure Prevention:** Attempting to access, edit, or delete another user's task returns a `404 Not Found` rather than a `403 Forbidden`.
+3. **Cryptographic Password Reset Tokens:** 32-byte random hex tokens generated using `crypto.randomBytes(32)` with 15-minute TTL. Stored only as SHA-256 hashes in MongoDB and consumed atomically upon password update.
+4. **Active Session Revocation on Password Reset:** A `tokenVersion` field in the user document and JWT payload ensures that resetting a password instantly invalidates all previously issued JWT tokens across all devices.
+5. **Anti-Enumeration Defenses:** Forgot-password and resend-OTP endpoints always return generic responses, completely preventing attackers from discovering whether an email exists or is verified.
+6. **Timing-Safe Verification:** OTP verification uses `crypto.timingSafeEqual` over fixed-length hex digests to eliminate timing side-channel attacks.
+7. **Atomic Single-Use Update:** OTP and password reset operations use Mongoose `findOneAndUpdate` with atomic conditions ensuring single-use protection and eliminating concurrent race conditions.
+8. **No Dangerous TTL Account Deletion:** Rather than using MongoDB TTL indices that could delete the entire user document upon OTP expiration, expiration is verified at application runtime.
+9. **HttpOnly Cookies over LocalStorage:** JWT access tokens are stored in `HttpOnly`, `SameSite=lax`, `Secure` cookies. No JWTs or sensitive credentials are ever placed in `localStorage`.
+10. **Server-Derived Ownership:** Client payloads cannot specify or override the `owner` field on tasks. The backend derives the user ID from `req.user._id` and queries MongoDB using `{ _id: taskId, owner: req.user._id }`.
+11. **Last Active Administrator Safeguard:** The backend checks the count of active administrators before allowing any admin deactivation or role demotion.
+12. **Information Disclosure Prevention:** Attempting to access, edit, or delete another user's task returns a `404 Not Found` rather than a `403 Forbidden`.
 
 ---
 

@@ -1,6 +1,8 @@
 const User = require('../models/User');
+const env = require('../config/env');
 const { generateToken } = require('../utils/token');
 const { generateNumericOtp, hashOtp, verifyOtpHash } = require('../utils/otp');
+const { generateResetToken, hashResetToken } = require('../utils/resetToken');
 const emailService = require('./emailService');
 
 class AuthService {
@@ -273,6 +275,103 @@ class AuthService {
     return {
       user: user.toJSON(),
       token,
+    };
+  }
+
+  /**
+   * Request password reset token and dispatch email
+   * Returns generic response to prevent account enumeration
+   * @param {Object} param0 
+   * @returns {Promise<{ message: string }>}
+   */
+  async forgotPassword({ email }) {
+    const normalizedEmail = email.toLowerCase().trim();
+    const genericMessage = 'If an account exists for this email address, you will receive instructions to reset your password.';
+
+    const user = await User.findOne({ email: normalizedEmail }).select('+passwordResetTokenHash +passwordResetExpiresAt');
+
+    // Only process eligible accounts: exists, active, and verified
+    if (!user || !user.isActive || !user.isEmailVerified) {
+      return { message: genericMessage };
+    }
+
+    // Generate cryptographically secure random token (64 hex characters)
+    const rawToken = generateResetToken();
+    const hashedToken = hashResetToken(rawToken);
+
+    user.passwordResetTokenHash = hashedToken;
+    user.passwordResetExpiresAt = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes expiry
+    await user.save();
+
+    // Construct secure reset link using trusted FRONTEND_URL
+    const frontendBase = env.FRONTEND_URL || env.CLIENT_URL || 'http://localhost:5173';
+    const resetUrl = `${frontendBase.replace(/\/+$/, '')}/reset-password?token=${rawToken}`;
+
+    try {
+      await emailService.sendPasswordResetEmail({
+        to: user.email,
+        name: user.name,
+        resetUrl,
+        expiresInMinutes: 15,
+      });
+    } catch (error) {
+      // Clean up token on operational failure so invalid state is not left behind
+      await User.updateOne(
+        { _id: user._id },
+        { $set: { passwordResetTokenHash: null, passwordResetExpiresAt: null } }
+      );
+      console.error(`Failed to send password reset email to ${normalizedEmail}:`, error.message);
+      const deliveryError = new Error('Failed to send password reset email. Please try again later.');
+      deliveryError.statusCode = 502;
+      throw deliveryError;
+    }
+
+    return { message: genericMessage };
+  }
+
+  /**
+   * Reset user password using token
+   * Validates token, hashes new password, invalidates token and existing sessions atomically
+   * @param {Object} param0 
+   * @returns {Promise<{ message: string }>}
+   */
+  async resetPassword({ token, password }) {
+    if (!token || typeof token !== 'string') {
+      const error = new Error('Password reset link is invalid or has expired.');
+      error.statusCode = 400;
+      throw error;
+    }
+
+    const hashedToken = hashResetToken(token);
+    const newPasswordHash = await User.hashPassword(password);
+
+    // Atomic update: finds user with exact token hash and valid expiry,
+    // updates password, increments tokenVersion to revoke active JWTs,
+    // and clears the token in one atomic operation (preventing concurrent reuse)
+    const updatedUser = await User.findOneAndUpdate(
+      {
+        passwordResetTokenHash: hashedToken,
+        passwordResetExpiresAt: { $gt: new Date() },
+      },
+      {
+        $set: {
+          passwordHash: newPasswordHash,
+          passwordResetTokenHash: null,
+          passwordResetExpiresAt: null,
+        },
+        $inc: { tokenVersion: 1 },
+      },
+      { new: true }
+    );
+
+    if (!updatedUser) {
+      const error = new Error('Password reset link is invalid or has expired.');
+      error.statusCode = 400;
+      throw error;
+    }
+
+    return {
+      message: 'Password has been reset successfully. You can now log in with your new password.',
     };
   }
 }

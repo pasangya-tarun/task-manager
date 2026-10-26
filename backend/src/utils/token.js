@@ -13,6 +13,7 @@ const generateToken = (user) => {
     sub: user._id.toString(),
     email: user.email,
     role: user.role,
+    tokenVersion: user.tokenVersion || 0,
   };
 
   return jwt.sign(payload, env.JWT_SECRET, {

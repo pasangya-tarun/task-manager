@@ -64,6 +64,21 @@ const userSchema = new mongoose.Schema(
       select: false,
       default: null,
     },
+    passwordResetTokenHash: {
+      type: String,
+      select: false,
+      default: null,
+      index: true,
+    },
+    passwordResetExpiresAt: {
+      type: Date,
+      select: false,
+      default: null,
+    },
+    tokenVersion: {
+      type: Number,
+      default: 0,
+    },
   },
   {
     timestamps: true,
@@ -74,6 +89,8 @@ const userSchema = new mongoose.Schema(
         delete ret.emailOtpExpiresAt;
         delete ret.emailOtpAttempts;
         delete ret.emailOtpLastSentAt;
+        delete ret.passwordResetTokenHash;
+        delete ret.passwordResetExpiresAt;
         delete ret.__v;
         return ret;
       },
@@ -85,6 +102,8 @@ const userSchema = new mongoose.Schema(
         delete ret.emailOtpExpiresAt;
         delete ret.emailOtpAttempts;
         delete ret.emailOtpLastSentAt;
+        delete ret.passwordResetTokenHash;
+        delete ret.passwordResetExpiresAt;
         delete ret.__v;
         return ret;
       },

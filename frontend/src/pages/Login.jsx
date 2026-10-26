@@ -112,9 +112,24 @@ const Login = () => {
           </div>
 
           <div className="form-group">
-            <label htmlFor="login-password-input" className="form-label">
-              Password
-            </label>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem' }}>
+              <label htmlFor="login-password-input" className="form-label" style={{ marginBottom: 0 }}>
+                Password
+              </label>
+              <Link
+                to="/forgot-password"
+                id="link-forgot-password"
+                style={{
+                  fontSize: '0.85rem',
+                  color: '#818cf8',
+                  fontWeight: 600,
+                  textDecoration: 'none',
+                  transition: 'color 0.2s',
+                }}
+              >
+                Forgot Password?
+              </Link>
+            </div>
             <input
               id="login-password-input"
               type="password"
@@ -144,12 +159,23 @@ const Login = () => {
           fontSize: '0.88rem',
           color: 'var(--text-secondary)',
           borderTop: '1px solid var(--border-subtle)',
-          paddingTop: '1.25rem'
+          paddingTop: '1.25rem',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '0.6rem',
         }}>
-          Don't have an account?{' '}
-          <Link to="/register" id="link-to-register" style={{ fontWeight: 600 }}>
-            Create an account
-          </Link>
+          <div>
+            Forgot your password?{' '}
+            <Link to="/forgot-password" id="link-forgot-password-bottom" style={{ fontWeight: 600, color: '#818cf8' }}>
+              Reset it here
+            </Link>
+          </div>
+          <div>
+            Don't have an account?{' '}
+            <Link to="/register" id="link-to-register" style={{ fontWeight: 600 }}>
+              Create an account
+            </Link>
+          </div>
         </div>
       </div>
     </div>

@@ -42,6 +42,19 @@ const authenticate = async (req, res, next) => {
       return errorResponse(res, 401, 'User account no longer exists.');
     }
 
+    // Invalidate session if password was reset or tokenVersion changed
+    if (
+      decoded.tokenVersion !== undefined &&
+      user.tokenVersion !== undefined &&
+      decoded.tokenVersion !== user.tokenVersion
+    ) {
+      return errorResponse(
+        res,
+        401,
+        'Session invalidated due to password change. Please log in again.'
+      );
+    }
+
     // Account active check
     if (!user.isActive) {
       return errorResponse(
